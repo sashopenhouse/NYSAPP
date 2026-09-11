@@ -20,6 +20,14 @@ This means:
 - The sync service is a **webhook receiver**, not a poller. It listens for Connecteam form events, maps `submittingUserId` + job linkage to a `contacts`/`projects` row (via a Connecteam job ID or job code stored against the project at deal-close time), and appends a `project_events` row.
 - Job custom fields (via the Jobs API) remain useful for slower-moving attributes (product lines, crew assignment, install window) that don't need real-time push — synced on a periodic pull instead.
 
+## Live infrastructure (2026-09-11)
+
+- Supabase project: `NYSAPP`, ref `gbwhdieifcfrgzazpgas`, org "Sash Open House", region us-east-1.
+- URL: `https://gbwhdieifcfrgzazpgas.supabase.co`
+- Migration `0001_init.sql` applied — all 10 tables live with RLS enabled.
+- Edge function `connecteam-webhook` deployed (JWT verification disabled — this endpoint is called by Connecteam, not a Supabase client, and authenticates via a shared-secret header instead). Endpoint: `https://gbwhdieifcfrgzazpgas.supabase.co/functions/v1/connecteam-webhook`.
+- **TODO before pointing real Connecteam webhooks here:** set the `CONNECTEAM_WEBHOOK_SECRET` project secret. Until set, the function's signature check is skipped entirely (see `index.ts`), so it is currently open — acceptable only because nothing external points at it yet.
+
 ## Open items to confirm with the Connecteam account / NYS ops before Phase 1 build-out
 
 1. Exact webhook registration flow (`Setting up webhook via API` doc) and whether NYS's Connecteam plan tier includes API + webhooks (API access is Expert/Enterprise-plan gated).
