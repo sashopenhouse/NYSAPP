@@ -1,0 +1,81 @@
+workflows:
+  ios-beta:
+    name: iOS Beta (TestFlight)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "beta-*"
+          include: true
+    environment:
+      xcode: latest
+      cocoapods: default
+      groups:
+        # Create this group in Codemagic UI: App Store Connect API key,
+        # signing certificate reference, DEVELOPMENT_TEAM. Stubbed here —
+        # see BUILD_PLAN.md scaffold-reuse notes for the shared cert.
+        - ios_signing
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: |
+          cd ios/NYSApp
+          xcodegen generate
+      - name: Set up code signing
+        script: |
+          cd ios/NYSApp
+          xcode-project use-profiles
+      - name: Build ipa
+        script: |
+          cd ios/NYSApp
+          xcode-project build-ipa --project NYSApp.xcodeproj --scheme NYSApp
+    artifacts:
+      - ios/NYSApp/build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+
+  ios-release:
+    name: iOS Release (App Store)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "release-*"
+          include: true
+    environment:
+      xcode: latest
+      cocoapods: default
+      groups:
+        - ios_signing
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: |
+          cd ios/NYSApp
+          xcodegen generate
+      - name: Set up code signing
+        script: |
+          cd ios/NYSApp
+          xcode-project use-profiles
+      - name: Build ipa
+        script: |
+          cd ios/NYSApp
+          xcode-project build-ipa --project NYSApp.xcodeproj --scheme NYSApp
+    artifacts:
+      - ios/NYSApp/build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: false

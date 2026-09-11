@@ -1,0 +1,8 @@
+.DS_Store
+ios/NYSApp/NYSApp.xcodeproj/
+ios/NYSApp/build/
+ios/NYSApp/.build/
+*.xcuserstate
+xcuserdata/
+.env
+.env.local
