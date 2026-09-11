@@ -53,6 +53,8 @@ Does not carry over:
 
 No `.netrc` secure file needed (that was a Huella/Mapbox CocoaPods requirement, Flutter only).
 
+**Scaffold alignment (2026-09-11):** compared directly against the Vitaminly app's actual working scaffold and matched it — same Apple Developer Team ID (`64X5Z6TNJQ`), same `agvtool`-driven versioning (`VERSIONING_SYSTEM: apple-generic` at project scope), same manual Release-config code signing paired with a scripted `fetch-signing-files --create` Codemagic flow (not the declarative `ios_signing:` group, which Vitaminly's own comments note fails on a first-ever App ID), same `.gitignore` signing-material patterns, same `.swiftlint.yml` house rules. See `ios/NYSApp/project.yml` and `codemagic.yaml`.
+
 ## Data model
 
 Core tables in Supabase:

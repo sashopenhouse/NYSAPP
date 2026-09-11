@@ -1,22 +1,22 @@
 workflows:
-  ios-beta:
-    name: iOS Beta (TestFlight)
-    max_build_duration: 60
+  # Build-only workflow (no code signing required). Runs on every push to main so broken
+  # code surfaces immediately with a full error list, without touching TestFlight.
+  ios-build:
+    name: NYSApp iOS Build
+    max_build_duration: 120
     instance_type: mac_mini_m2
+    environment:
+      vars:
+        XCODE_PROJECT: "NYSApp.xcodeproj"
+        XCODE_SCHEME: "NYSApp"
+      xcode: latest
     triggering:
       events:
-        - tag
-      tag_patterns:
-        - pattern: "beta-*"
+        - push
+      cancel_previous_builds: true
+      branch_patterns:
+        - pattern: main
           include: true
-    environment:
-      xcode: latest
-      cocoapods: default
-      groups:
-        # Create this group in Codemagic UI: App Store Connect API key,
-        # signing certificate reference, DEVELOPMENT_TEAM. Stubbed here —
-        # see BUILD_PLAN.md scaffold-reuse notes for the shared cert.
-        - ios_signing
     scripts:
       - name: Install XcodeGen
         script: brew install xcodegen
@@ -24,38 +24,76 @@ workflows:
         script: |
           cd ios/NYSApp
           xcodegen generate
-      - name: Set up code signing
+      - name: Build project
         script: |
-          cd ios/NYSApp
-          xcode-project use-profiles
-      - name: Build ipa
-        script: |
-          cd ios/NYSApp
-          xcode-project build-ipa --project NYSApp.xcodeproj --scheme NYSApp
+          mkdir -p /tmp/xcodebuild_logs
+          set -o pipefail
+          set +e
+          xcodebuild build \
+            -project "$CM_BUILD_DIR/ios/NYSApp/$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            -configuration Debug \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee /tmp/xcodebuild_logs/build.log
+          BUILD_EXIT=${PIPESTATUS[0]}
+          set -e
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo ""
+            echo "####################################################"
+            echo "# BUILD FAILED - FULL ERROR LIST"
+            echo "####################################################"
+            echo ""
+            grep -i "error:" /tmp/xcodebuild_logs/build.log | head -80 || true
+            echo ""
+            echo "####################################################"
+            echo "# LAST 50 LINES OF BUILD LOG"
+            echo "####################################################"
+            tail -50 /tmp/xcodebuild_logs/build.log || true
+            exit $BUILD_EXIT
+          fi
     artifacts:
-      - ios/NYSApp/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - /Users/builder/Library/Developer/Xcode/DerivedData/**/*.app
     publishing:
-      app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: true
+      email:
+        recipients:
+          - erick.florez@gmail.com
+        notify:
+          success: true
+          failure: true
 
   ios-release:
-    name: iOS Release (App Store)
-    max_build_duration: 60
+    name: NYSApp iOS Release
+    max_build_duration: 120
     instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      # No declarative `ios_signing:` block here on purpose. That block only *fetches*
+      # profiles that already exist — it fails with "No matching profiles found" when the
+      # App ID has never had an App Store profile issued. The explicit CLI flow below
+      # passes --create, which provisions the App ID and profile on first run.
+      # Supplies CERTIFICATE_PRIVATE_KEY(_B64), the RSA key the distribution certificate is
+      # bound to. It must be generated ONCE and stored encrypted in this group — never
+      # generated per build, which issues a new certificate every run against Apple's cap
+      # of three. Reuse the same key/group as other Studio Florez apps if this ships under
+      # the same Apple Developer team (64X5Z6TNJQ).
+      groups:
+        - Default
+      vars:
+        XCODE_PROJECT: "NYSApp.xcodeproj"
+        XCODE_SCHEME: "NYSApp"
+        APP_BUNDLE_ID: "com.newyorksash.app"
+      xcode: latest
     triggering:
       events:
-        - tag
-      tag_patterns:
-        - pattern: "release-*"
+        - push
+      branch_patterns:
+        - pattern: release
           include: true
-    environment:
-      xcode: latest
-      cocoapods: default
-      groups:
-        - ios_signing
     scripts:
       - name: Install XcodeGen
         script: brew install xcodegen
@@ -63,19 +101,148 @@ workflows:
         script: |
           cd ios/NYSApp
           xcodegen generate
-      - name: Set up code signing
+      - name: Initialize keychain
+        script: keychain initialize
+      - name: Fetch or create signing files
+        script: |
+          set -e
+          KEY_FILE=/tmp/cert_key.pem
+
+          # A PEM pasted straight into the environment-variable form arrives with its
+          # newlines mangled — CRLF, or collapsed entirely — and the CLI then rejects it.
+          # Base64 is a single line with no whitespace, so nothing survives to be mangled.
+          #
+          # Decoding uses `openssl base64 -d -A`, NOT `base64 --decode`. These runners are
+          # macOS: `base64` there is the BSD build, whose decode flag is -D and which does
+          # not accept GNU long options. It quietly ENCODES instead of erroring, so the
+          # pipeline exits 0 and hands back a valid-looking but useless file. `-A` tells
+          # openssl the input is one unwrapped line.
+          RAW=""
+          SOURCE_VAR=""
+          if [ -n "${CERTIFICATE_PRIVATE_KEY_B64:-}" ]; then
+            RAW="$CERTIFICATE_PRIVATE_KEY_B64"
+            SOURCE_VAR="CERTIFICATE_PRIVATE_KEY_B64"
+          elif [ -n "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+            RAW="$CERTIFICATE_PRIVATE_KEY"
+            SOURCE_VAR="CERTIFICATE_PRIVATE_KEY"
+          fi
+
+          # A real 2048-bit key is ~1700 bytes as PEM, ~2270 as base64. Anything much
+          # shorter is a truncated or wrong value, and saying so beats letting it fail
+          # later as an unreadable decode.
+          if [ -n "$RAW" ] && [ "${#RAW}" -lt 800 ]; then
+            echo "$SOURCE_VAR holds only ${#RAW} characters — far too short for a 2048-bit key."
+            echo "Expect ~1700 chars for a PEM, ~2270 for base64. The value is truncated or wrong."
+            echo "Delete it and add CERTIFICATE_PRIVATE_KEY_B64 in group Default instead."
+            exit 1
+          fi
+
+          if [ -n "$RAW" ]; then
+            case "$RAW" in
+              *BEGIN*PRIVATE*KEY*)
+                # Already a PEM. Strip CR so a Windows-clipboard paste still parses.
+                printf '%s' "$RAW" | tr -d '\r' > "$KEY_FILE"
+                ;;
+              *)
+                printf '%s' "$RAW" | tr -d '[:space:]' | openssl base64 -d -A > "$KEY_FILE" 2>/dev/null || true
+                ;;
+            esac
+          else
+            echo "Neither CERTIFICATE_PRIVATE_KEY_B64 nor CERTIFICATE_PRIVATE_KEY is set."
+            echo ""
+            echo "ONE-TIME setup, done outside the repo:"
+            echo "  1. openssl genrsa -out cert_key.pem 2048"
+            echo "     openssl rsa -in cert_key.pem -traditional -out cert_key_pkcs1.pem"
+            echo "     base64 -w0 cert_key_pkcs1.pem"
+            echo "  2. Codemagic > app settings > Environment variables:"
+            echo "       name   CERTIFICATE_PRIVATE_KEY_B64"
+            echo "       value  that single base64 line"
+            echo "       group  Default"
+            echo "       tick 'Secure'"
+            echo "  3. Keep the .pem. Reusing it is what keeps every later build on the"
+            echo "     SAME distribution certificate. If NYSAPP ships under the same"
+            echo "     Apple Developer team as other Studio Florez apps, the existing key"
+            echo "     may already be reusable instead of generating a new one."
+            exit 1
+          fi
+
+          # Fail here, with a clear message, rather than 40 lines deeper in the CLI.
+          if ! openssl rsa -in "$KEY_FILE" -noout -check >/dev/null 2>&1; then
+            echo "The decoded value is not a valid RSA private key."
+            echo ""
+            SHAPE=base64
+            case "$RAW" in *BEGIN*) SHAPE=PEM ;; esac
+
+            CHARSET=no
+            if printf '%s' "$RAW" | tr -d '[:space:]' | grep -qE '^[A-Za-z0-9+/=]+$'; then
+              CHARSET=yes
+            fi
+
+            DECODED_BYTES=$(wc -c < "$KEY_FILE" | tr -d ' ')
+            DECODED_HEAD=$(head -c 40 "$KEY_FILE" | LC_ALL=C tr -dc '[:print:]' || true)
+
+            echo "Diagnostics (no key material is printed):"
+            echo "  source var  : $SOURCE_VAR"
+            echo "  raw length  : ${#RAW} chars"
+            echo "  looks like  : $SHAPE"
+            echo "  charset ok  : $CHARSET"
+            echo "  decoded to  : $DECODED_BYTES bytes"
+            echo "  decoded head: $DECODED_HEAD"
+            echo ""
+            echo "Expected: ~1700 bytes beginning '-----BEGIN RSA PRIVATE KEY-----'."
+            echo "If 'charset ok' is NO, the form mangled the value on paste."
+            echo "If it decoded to 0 bytes, the variable is empty or in the wrong group."
+            exit 1
+          fi
+          echo "Signing key loaded and validated ($(wc -c < "$KEY_FILE" | tr -d ' ') bytes)."
+
+          # --create provisions the App ID and the App Store profile if they do not exist.
+          app-store-connect fetch-signing-files "$APP_BUNDLE_ID" \
+            --type IOS_APP_STORE --create --certificate-key "@file:$KEY_FILE"
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Set up code signing settings on Xcode project
         script: |
           cd ios/NYSApp
           xcode-project use-profiles
-      - name: Build ipa
+      - name: Increment build number
         script: |
           cd ios/NYSApp
-          xcode-project build-ipa --project NYSApp.xcodeproj --scheme NYSApp
+          agvtool new-version -all $BUILD_NUMBER
+      - name: Build ipa for distribution
+        script: |
+          set +e
+          mkdir -p /tmp/xcodebuild_logs
+          cd ios/NYSApp
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/ios/NYSApp/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME" \
+            2>&1 | tee /tmp/xcodebuild_logs/archive.log
+          BUILD_EXIT=${PIPESTATUS[0]}
+          set -e
+
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo ""
+            echo "####################################################"
+            echo "# ARCHIVE FAILED - FULL ERROR LIST"
+            echo "####################################################"
+            echo ""
+            grep -i "error:" /tmp/xcodebuild_logs/archive.log | head -80 || true
+            exit $BUILD_EXIT
+          fi
     artifacts:
       - ios/NYSApp/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
     publishing:
       app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: false
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+      email:
+        recipients:
+          - erick.florez@gmail.com
+        notify:
+          success: true
+          failure: true
