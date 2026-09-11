@@ -44,6 +44,7 @@ targets:
         NSCameraUsageDescription: New York Sash uses your camera in the visualizer to preview window and siding styles on your home.
         UIAppFonts:
           - Inter-Variable.ttf
+        CFBundleIconName: AppIcon
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.newyorksash.app
