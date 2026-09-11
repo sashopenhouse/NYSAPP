@@ -27,6 +27,7 @@ This means:
 - Migration `0001_init.sql` applied — all 10 tables live with RLS enabled.
 - Edge function `connecteam-webhook` deployed (JWT verification disabled — this endpoint is called by Connecteam, not a Supabase client, and authenticates via a shared-secret header instead). Endpoint: `https://gbwhdieifcfrgzazpgas.supabase.co/functions/v1/connecteam-webhook`.
 - **TODO before pointing real Connecteam webhooks here:** set the `CONNECTEAM_WEBHOOK_SECRET` project secret. Until set, the function's signature check is skipped entirely (see `index.ts`), so it is currently open — acceptable only because nothing external points at it yet.
+- **Connecteam API key:** the user has a Connecteam API key (for calling Connecteam's API — e.g. registering the webhook, or pulling Jobs custom fields on a polling cadence). Set it in the Supabase dashboard (Project Settings → Edge Functions → Secrets) as `CONNECTEAM_API_KEY`, never in the repo or chat. Not yet consumed by any function — `connecteam-webhook` only receives inbound webhooks and doesn't call back out to Connecteam yet. A future function (webhook self-registration, or the Jobs custom-field poller for slower-moving attributes) will read it via `Deno.env.get("CONNECTEAM_API_KEY")`.
 
 ## Open items to confirm with the Connecteam account / NYS ops before Phase 1 build-out
 
