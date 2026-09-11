@@ -51,6 +51,7 @@ targets:
         # Set per-target because XcodeGen's built-in setting presets otherwise supply the
         # iOS default of "1,2" (iPhone + iPad) at target scope, overriding project scope.
         TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
         Release:
           CODE_SIGN_STYLE: Manual
