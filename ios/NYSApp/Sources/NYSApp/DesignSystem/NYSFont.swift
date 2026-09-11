@@ -5,24 +5,26 @@ import SwiftUI
 /// use weight 900 (Black) in sentence case; body copy uses weight 300 (Light).
 /// See docs/brand-guidelines.md.
 ///
-/// TODO: bundle the actual Inter font files. Google Fonts ships Inter under
-/// the SIL Open Font License (https://fonts.google.com/specimen/Inter) —
-/// download Inter-Black.ttf / Inter-Light.ttf (etc.), add them under
-/// Resources/Fonts/, and register each filename in Info.plist's
-/// UIAppFonts array. `.custom(name:)` with a name SwiftUI can't resolve
-/// falls back to the system font silently (no crash), which is why the
-/// app still renders correctly today — it's just not actually on-brand
-/// until the font files are added.
+/// Bundled as Resources/Fonts/Inter-Variable.ttf (SIL Open Font License,
+/// license text alongside it as Inter-OFL.txt), registered in Info.plist's
+/// UIAppFonts. It's a *variable* font — its internal PostScript name is
+/// "Inter-Regular" regardless of weight, so weight comes from `.weight()`
+/// on top of `.custom(name:)`, not from separate per-weight font names.
 enum NYSFont {
+    private static let postScriptName = "Inter-Regular"
+
     static func headline(_ size: CGFloat = 28) -> Font {
-        .custom("Inter-Black", size: size, relativeTo: .title)
+        .custom(postScriptName, size: size, relativeTo: .title)
+            .weight(.black)
     }
 
     static func subheadline(_ size: CGFloat = 20) -> Font {
-        .custom("Inter-Black", size: size, relativeTo: .title3)
+        .custom(postScriptName, size: size, relativeTo: .title3)
+            .weight(.black)
     }
 
     static func body(_ size: CGFloat = 17) -> Font {
-        .custom("Inter-Light", size: size, relativeTo: .body)
+        .custom(postScriptName, size: size, relativeTo: .body)
+            .weight(.light)
     }
 }
