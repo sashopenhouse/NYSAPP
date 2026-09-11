@@ -34,6 +34,7 @@ struct TimelineView: View {
             }
             .padding()
         }
+        .background(NYSColor.white)
         .refreshable { await service.loadEvents() }
         .task {
             await service.start()
@@ -44,16 +45,17 @@ struct TimelineView: View {
         .overlay {
             if service.isLoading && service.events.isEmpty {
                 ProgressView()
+                    .tint(NYSColor.brandRed)
             }
         }
         .safeAreaInset(edge: .top) {
             if let errorMessage = service.errorMessage {
                 Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                    .font(NYSFont.body(13))
+                    .foregroundStyle(NYSColor.white)
                     .frame(maxWidth: .infinity)
                     .padding(8)
-                    .background(.red.opacity(0.1))
+                    .background(NYSColor.actionRed)
             }
         }
         .navigationTitle("Your Project")
@@ -87,7 +89,7 @@ private struct TimelineRow: View {
                 marker
                 if !isLast {
                     Rectangle()
-                        .fill(status == .complete ? Color.accentColor : Color.secondary.opacity(0.3))
+                        .fill(status == .complete ? NYSColor.brandRed : NYSColor.slateGray.opacity(0.3))
                         .frame(width: 2)
                 }
             }
@@ -95,13 +97,13 @@ private struct TimelineRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(stage.title)
-                    .font(.headline)
-                    .foregroundStyle(status == .upcoming ? .secondary : .primary)
+                    .font(NYSFont.subheadline(17))
+                    .foregroundStyle(status == .upcoming ? NYSColor.slateGray : NYSColor.black)
 
                 if let occurredAt {
                     Text(occurredAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(NYSFont.body(13))
+                        .foregroundStyle(NYSColor.slateGray)
                 }
             }
             .padding(.bottom, isLast ? 0 : 24)
@@ -115,13 +117,13 @@ private struct TimelineRow: View {
         switch status {
         case .complete:
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(NYSColor.brandRed)
         case .current:
             Image(systemName: "circle.fill")
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(NYSColor.brandRed)
         case .upcoming:
             Image(systemName: "circle")
-                .foregroundStyle(.secondary.opacity(0.5))
+                .foregroundStyle(NYSColor.slateGray.opacity(0.5))
         }
     }
 }

@@ -5,6 +5,7 @@ struct NYSApp: App {
     var body: some Scene {
         WindowGroup {
             RootRouterView()
+                .tint(NYSColor.brandRed)
         }
     }
 }

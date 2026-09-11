@@ -11,8 +11,8 @@ struct PhoneSignInView: View {
     var body: some View {
         VStack(spacing: 20) {
             Text("New York Sash")
-                .font(.title)
-                .bold()
+                .font(NYSFont.headline())
+                .foregroundStyle(NYSColor.black)
 
             switch auth.status {
             case .signedOut:
@@ -21,32 +21,34 @@ struct PhoneSignInView: View {
                 codeEntry(phone: phone)
             case .signedIn:
                 Text("Signed in.")
+                    .font(NYSFont.body())
             }
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                    .font(NYSFont.body(13))
+                    .foregroundStyle(NYSColor.actionRed)
                     .multilineTextAlignment(.center)
             }
         }
         .padding()
+        .background(NYSColor.white)
         .disabled(isSubmitting)
     }
 
     private var phoneEntry: some View {
         VStack(spacing: 12) {
             Text("Enter your phone number to sign in.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(NYSFont.body())
+                .foregroundStyle(NYSColor.slateGray)
             TextField("(555) 555-5555", text: $phoneDigits)
                 .keyboardType(.phonePad)
                 .textContentType(.telephoneNumber)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.nys)
             Button("Send code") {
                 Task { await sendCode() }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.nysPrimary)
             .disabled(phoneDigits.filter(\.isNumber).count < 10)
         }
     }
@@ -54,15 +56,15 @@ struct PhoneSignInView: View {
     private func codeEntry(phone: String) -> some View {
         VStack(spacing: 12) {
             Text("Enter the code we texted you.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(NYSFont.body())
+                .foregroundStyle(NYSColor.slateGray)
             TextField("123456", text: $code)
                 .keyboardType(.numberPad)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.nys)
             Button("Verify") {
                 Task { await verifyCode(phone: phone) }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.nysPrimary)
             .disabled(code.count < 6)
         }
     }
