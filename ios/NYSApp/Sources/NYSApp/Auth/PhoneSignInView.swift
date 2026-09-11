@@ -76,6 +76,10 @@ struct PhoneSignInView: View {
         do {
             try await auth.sendCode(toE164Phone: e164Phone)
         } catch {
+            // The friendly copy below is intentionally generic for end users;
+            // the underlying error (e.g. an SMS provider misconfiguration)
+            // only shows up here, in the Xcode console, during development.
+            print("sendCode failed: \(error)")
             errorMessage = "Couldn't send that code. Check the number and try again."
         }
     }
@@ -87,6 +91,7 @@ struct PhoneSignInView: View {
         do {
             try await auth.verifyCode(code, forE164Phone: phone)
         } catch {
+            print("verifyCode failed: \(error)")
             errorMessage = "That code didn't match. Try again."
         }
     }
