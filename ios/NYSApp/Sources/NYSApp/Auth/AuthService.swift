@@ -5,7 +5,7 @@ import Supabase
 final class AuthService {
     enum Status: Equatable {
         case signedOut
-        case codeSent(phone: String)
+        case codeSent(email: String)
         case signedIn
     }
 
@@ -16,13 +16,18 @@ final class AuthService {
         self.client = client
     }
 
-    func sendCode(toE164Phone phone: String) async throws {
-        try await client.auth.signInWithOTP(phone: phone)
-        status = .codeSent(phone: phone)
+    /// Email OTP, not phone: Twilio SMS requires either a paid account or a
+    /// Twilio Verify service (trial-account SMS rejects Supabase's default
+    /// OTP template — see docs/sync-validation.md). Email needs no
+    /// third-party SMS provider, so it unblocks development now; phone can
+    /// come back as an additional option once SMS is sorted.
+    func sendCode(toEmail email: String) async throws {
+        try await client.auth.signInWithOTP(email: email)
+        status = .codeSent(email: email)
     }
 
-    func verifyCode(_ code: String, forE164Phone phone: String) async throws {
-        try await client.auth.verifyOTP(phone: phone, token: code, type: .sms)
+    func verifyCode(_ code: String, forEmail email: String) async throws {
+        try await client.auth.verifyOTP(email: email, token: code, type: .email)
         status = .signedIn
     }
 

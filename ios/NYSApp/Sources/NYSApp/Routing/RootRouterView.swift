@@ -9,7 +9,7 @@ struct RootRouterView: View {
         Group {
             switch auth.status {
             case .signedOut, .codeSent:
-                PhoneSignInView()
+                EmailSignInView()
             case .signedIn:
                 modeView
             }

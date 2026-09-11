@@ -1,9 +1,9 @@
 import SwiftUI
 
-struct PhoneSignInView: View {
+struct EmailSignInView: View {
     @Environment(AuthService.self) private var auth
 
-    @State private var phoneDigits = ""
+    @State private var email = ""
     @State private var code = ""
     @State private var isSubmitting = false
     @State private var errorMessage: String?
@@ -16,9 +16,9 @@ struct PhoneSignInView: View {
 
             switch auth.status {
             case .signedOut:
-                phoneEntry
-            case .codeSent(let phone):
-                codeEntry(phone: phone)
+                emailEntry
+            case .codeSent(let email):
+                codeEntry(email: email)
             case .signedIn:
                 Text("Signed in.")
                     .font(NYSFont.body())
@@ -36,33 +36,35 @@ struct PhoneSignInView: View {
         .disabled(isSubmitting)
     }
 
-    private var phoneEntry: some View {
+    private var emailEntry: some View {
         VStack(spacing: 12) {
-            Text("Enter your phone number to sign in.")
+            Text("Enter your email to sign in.")
                 .font(NYSFont.body())
                 .foregroundStyle(NYSColor.slateGray)
-            TextField("(555) 555-5555", text: $phoneDigits)
-                .keyboardType(.phonePad)
-                .textContentType(.telephoneNumber)
+            TextField("you@example.com", text: $email)
+                .keyboardType(.emailAddress)
+                .textContentType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
                 .textFieldStyle(.nys)
             Button("Send code") {
                 Task { await sendCode() }
             }
             .buttonStyle(.nysPrimary)
-            .disabled(phoneDigits.filter(\.isNumber).count < 10)
+            .disabled(!isPlausibleEmail(email))
         }
     }
 
-    private func codeEntry(phone: String) -> some View {
+    private func codeEntry(email: String) -> some View {
         VStack(spacing: 12) {
-            Text("Enter the code we texted you.")
+            Text("Enter the code we emailed you.")
                 .font(NYSFont.body())
                 .foregroundStyle(NYSColor.slateGray)
             TextField("123456", text: $code)
                 .keyboardType(.numberPad)
                 .textFieldStyle(.nys)
             Button("Verify") {
-                Task { await verifyCode(phone: phone) }
+                Task { await verifyCode(email: email) }
             }
             .buttonStyle(.nysPrimary)
             .disabled(code.count < 6)
@@ -74,30 +76,26 @@ struct PhoneSignInView: View {
         isSubmitting = true
         defer { isSubmitting = false }
         do {
-            try await auth.sendCode(toE164Phone: e164Phone)
+            try await auth.sendCode(toEmail: email)
         } catch {
-            // The friendly copy below is intentionally generic for end users;
-            // the underlying error (e.g. an SMS provider misconfiguration)
-            // only shows up here, in the Xcode console, during development.
             print("sendCode failed: \(error)")
-            errorMessage = "Couldn't send that code. Check the number and try again."
+            errorMessage = "Couldn't send that code. Check the email and try again."
         }
     }
 
-    private func verifyCode(phone: String) async {
+    private func verifyCode(email: String) async {
         errorMessage = nil
         isSubmitting = true
         defer { isSubmitting = false }
         do {
-            try await auth.verifyCode(code, forE164Phone: phone)
+            try await auth.verifyCode(code, forEmail: email)
         } catch {
             print("verifyCode failed: \(error)")
             errorMessage = "That code didn't match. Try again."
         }
     }
 
-    /// US-only for now, matching the build plan's Central NY customer base.
-    private var e164Phone: String {
-        "+1" + phoneDigits.filter(\.isNumber)
+    private func isPlausibleEmail(_ value: String) -> Bool {
+        value.contains("@") && value.contains(".") && value.count >= 6
     }
 }
