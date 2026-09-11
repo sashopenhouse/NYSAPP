@@ -1,0 +1,96 @@
+import SwiftUI
+
+struct PhoneSignInView: View {
+    @Environment(AuthService.self) private var auth
+
+    @State private var phoneDigits = ""
+    @State private var code = ""
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("New York Sash")
+                .font(.title)
+                .bold()
+
+            switch auth.status {
+            case .signedOut:
+                phoneEntry
+            case .codeSent(let phone):
+                codeEntry(phone: phone)
+            case .signedIn:
+                Text("Signed in.")
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding()
+        .disabled(isSubmitting)
+    }
+
+    private var phoneEntry: some View {
+        VStack(spacing: 12) {
+            Text("Enter your phone number to sign in.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            TextField("(555) 555-5555", text: $phoneDigits)
+                .keyboardType(.phonePad)
+                .textContentType(.telephoneNumber)
+                .textFieldStyle(.roundedBorder)
+            Button("Send code") {
+                Task { await sendCode() }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(phoneDigits.filter(\.isNumber).count < 10)
+        }
+    }
+
+    private func codeEntry(phone: String) -> some View {
+        VStack(spacing: 12) {
+            Text("Enter the code we texted you.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            TextField("123456", text: $code)
+                .keyboardType(.numberPad)
+                .textFieldStyle(.roundedBorder)
+            Button("Verify") {
+                Task { await verifyCode(phone: phone) }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(code.count < 6)
+        }
+    }
+
+    private func sendCode() async {
+        errorMessage = nil
+        isSubmitting = true
+        defer { isSubmitting = false }
+        do {
+            try await auth.sendCode(toE164Phone: e164Phone)
+        } catch {
+            errorMessage = "Couldn't send that code. Check the number and try again."
+        }
+    }
+
+    private func verifyCode(phone: String) async {
+        errorMessage = nil
+        isSubmitting = true
+        defer { isSubmitting = false }
+        do {
+            try await auth.verifyCode(code, forE164Phone: phone)
+        } catch {
+            errorMessage = "That code didn't match. Try again."
+        }
+    }
+
+    /// US-only for now, matching the build plan's Central NY customer base.
+    private var e164Phone: String {
+        "+1" + phoneDigits.filter(\.isNumber)
+    }
+}
