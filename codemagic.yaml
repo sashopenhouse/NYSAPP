@@ -1,6 +1,9 @@
 workflows:
-  # Build-only workflow (no code signing required). Runs on every push to main so broken
+  # Build-only workflow (no code signing required). Runs on every push to master so broken
   # code surfaces immediately with a full error list, without touching TestFlight.
+  # The branch pattern must match this repo's actual default branch (master). It read
+  # "main" until 2026-09-14, so this workflow silently never fired — pushes landed on
+  # master and nothing built, while `release` sat six commits behind.
   ios-build:
     name: NYSApp iOS Build
     max_build_duration: 120
@@ -15,7 +18,7 @@ workflows:
         - push
       cancel_previous_builds: true
       branch_patterns:
-        - pattern: main
+        - pattern: master
           include: true
     scripts:
       - name: Install XcodeGen
