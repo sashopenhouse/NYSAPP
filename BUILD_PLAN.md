@@ -99,6 +99,30 @@ The Slack and ConnectTeam photo pipeline is an internal crew feed: dumpsters, ro
 - Tracked referral code
 - Review prompt fired by the final walkthrough event, not a calendar date
 
+> **Pulled forward (2026-09-14):** the review prompt shipped early, at the
+> client's request, alongside a new offers surface. The trigger is a database
+> trigger on `project_events` inserting a `review_requests` row when a project
+> reaches `final` — the event-fired design above, not a calendar date. The
+> tracked referral code is still Phase 4.
+>
+> **No review gating.** The prompt is ungated: every customer sees the same
+> card and the same Google destination, with no "how did we do?" step routing
+> happy customers to Google and unhappy ones to a private form. That pattern
+> violates Google's review policies and the FTC's rule on suppressing negative
+> reviews, and would put the real NYS listing at risk. Unhappy customers are
+> pointed at the Messages tab, which is offered to everyone rather than shown
+> selectively by sentiment. `review_requests` deliberately records only our own
+> prompt (asked / opened / dismissed) and never the customer's rating.
+
+**Offers and sales alerts (added 2026-09-14)**
+- `offers` table, published + date-windowed, targeted by app mode
+  (`prospect` / `project` / `home_file`) so a customer mid-install isn't
+  pitched a new window
+- Rendered inline above each surface's own content, not as a dedicated tab:
+  an "Offers" tab in a project-tracking app reads as an ad surface
+- RLS enforces published + in-window, so an unpublished draft or expired
+  promo can never leak; audience filtering is a client concern
+
 ## Retention
 
 Nobody opens this daily. Notifications are the product. Each needs a defined upstream trigger in the sync layer, which is why the sync layer gets prototyped first.

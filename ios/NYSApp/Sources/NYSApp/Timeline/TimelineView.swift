@@ -4,10 +4,12 @@ struct TimelineView: View {
     let projectId: UUID
 
     @State private var service: TimelineService
+    @State private var reviewService: ReviewService
 
     init(projectId: UUID) {
         self.projectId = projectId
         _service = State(initialValue: TimelineService(projectId: projectId))
+        _reviewService = State(initialValue: ReviewService(projectId: projectId))
     }
 
     var body: some View {
@@ -21,6 +23,10 @@ struct TimelineView: View {
                     )
                 }
 
+                if reviewService.shouldPrompt {
+                    ReviewPromptCard(service: reviewService)
+                }
+
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(ProjectStage.allCases) { stage in
                         TimelineRow(
@@ -31,13 +37,21 @@ struct TimelineView: View {
                         )
                     }
                 }
+
+                OffersStrip(audience: .project)
             }
             .padding()
         }
         .background(NYSColor.white)
-        .refreshable { await service.loadEvents() }
+        .refreshable {
+            await service.loadEvents()
+            await reviewService.load()
+        }
         .task {
             await service.start()
+        }
+        .task {
+            await reviewService.load()
         }
         .onDisappear {
             Task { await service.stop() }
