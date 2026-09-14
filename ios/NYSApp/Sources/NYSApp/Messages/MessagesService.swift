@@ -59,7 +59,7 @@ final class MessagesService {
         do {
             messages = try await client
                 .from("messages")
-                .select("id, project_id, sender, body, created_at")
+                .select("id, project_id, sender, body, created_at, authored_by_agent")
                 .eq("project_id", value: projectId)
                 .order("created_at", ascending: true)
                 .execute()

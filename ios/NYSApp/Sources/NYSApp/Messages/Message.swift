@@ -7,6 +7,7 @@ struct Message: Decodable, Identifiable {
     let sender: String
     let body: String
     let createdAt: Date
+    let authoredByAgent: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -14,6 +15,19 @@ struct Message: Decodable, Identifiable {
         case sender
         case body
         case createdAt = "created_at"
+        case authoredByAgent = "authored_by_agent"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        projectId = try container.decode(UUID.self, forKey: .projectId)
+        sender = try container.decode(String.self, forKey: .sender)
+        body = try container.decode(String.self, forKey: .body)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        // Defaulted rather than required: messages written before the agent
+        // existed have no such column in older cached payloads.
+        authoredByAgent = try container.decodeIfPresent(Bool.self, forKey: .authoredByAgent) ?? false
     }
 
     /// Mirrors the `sender` check constraint. RLS only ever lets a client

@@ -105,9 +105,23 @@ private struct MessageBubble: View {
                     .font(NYSFont.body())
                     .foregroundStyle(message.isFromCustomer ? NYSColor.white : NYSColor.black)
 
-                Text(message.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(NYSFont.body(11))
-                    .foregroundStyle(message.isFromCustomer ? NYSColor.white.opacity(0.8) : NYSColor.slateGray)
+                HStack(spacing: 4) {
+                    // Disclosed, not hidden: a homeowner should be able to
+                    // tell an automated status reply from their project
+                    // manager typing.
+                    if message.authoredByAgent {
+                        Text("Automated reply")
+                            .font(NYSFont.body(11))
+                            .foregroundStyle(NYSColor.slateGray)
+                        Text("·")
+                            .font(NYSFont.body(11))
+                            .foregroundStyle(NYSColor.slateGray)
+                    }
+
+                    Text(message.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(NYSFont.body(11))
+                        .foregroundStyle(message.isFromCustomer ? NYSColor.white.opacity(0.8) : NYSColor.slateGray)
+                }
             }
             .padding(12)
             .background(message.isFromCustomer ? NYSColor.brandRed : NYSColor.lightGray)
