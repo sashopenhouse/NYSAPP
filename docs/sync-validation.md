@@ -35,6 +35,64 @@ This means:
 - Email auth itself needs no separate provider setup — Supabase sends confirmation/OTP emails via its own built-in mailer by default.
 - **Connecteam API key:** the user has a Connecteam API key (for calling Connecteam's API — e.g. registering the webhook, or pulling Jobs custom fields on a polling cadence). Set it in the Supabase dashboard (Project Settings → Edge Functions → Secrets) as `CONNECTEAM_API_KEY`, never in the repo or chat. Not yet consumed by any function — `connecteam-webhook` only receives inbound webhooks and doesn't call back out to Connecteam yet. A future function (webhook self-registration, or the Jobs custom-field poller for slower-moving attributes) will read it via `Deno.env.get("CONNECTEAM_API_KEY")`.
 
+## MarketSharp as a second upstream (2026-09-14)
+
+MarketSharp API access became available, so it was evaluated against the
+blocking question at the top of this doc. Findings, verified against
+MarketSharp's own public Swagger specs (no credentials used):
+
+- **No outbound webhooks.** Across 426 operations in both API versions
+  (`restapi.marketsharpm.com/swagger/docs/1.0` and `/2.0`) there is no event
+  subscription endpoint, no event catalogue and no delivery-target config.
+  The single webhook-shaped path, `POST /edge/webhook`, is an *inbound*
+  receiver for their Edge partner integration. Change detection is polling.
+- **Auth** is an OAuth2-style password grant against `POST /token` returning
+  a JWT. Application auth (`apikey` + `apisecret` + `empoid` + `companyId`)
+  works across companies; employee auth is tied to one login. `api-version`
+  is a required query parameter on every operation, and nearly every path is
+  company-scoped as `/companies/{companyId}/...`.
+- **Delta queries exist**, which is what makes polling viable rather than
+  brute force: `POST /companies/{companyId}/inquiries/filter` accepts
+  `start_modified_datetime` / `end_modified_datetime`. Appointments and
+  contacts have the same pair (contacts asymmetrically lacks the `end`).
+- **Jobs have no modified-date filter** — `JobSearchBindingModel` carries no
+  date fields at all. Jobs cannot be polled for change directly; the poller
+  pivots through inquiries.
+- **Rate limits are undocumented.** No `429` is defined on any operation and
+  no public guidance exists. The poller defaults to a conservative interval
+  and honours `Retry-After` if a 429 ever appears. **Confirm the real limit
+  with MarketSharp support before tightening it.**
+
+Two hazards that shaped the schema, both from MarketSharp's own docs:
+
+1. `lastModifiedDateTime` is in **company-local time, not UTC**, so a naive
+   cursor silently skips or double-reads records across a DST transition.
+   `sync_cursors.upstream_timezone` records the zone explicitly and the
+   poller formats window boundaries in it.
+2. **Records with no modification date return the current datetime**, so they
+   look freshly-modified on *every* poll, forever. Before this,
+   `project_events` had no uniqueness constraint of any kind — that
+   combination is an unbounded duplicate-row generator. Migration `0016` adds
+   a unique index on `(source, external_id, stage)` (partial, so Connecteam's
+   null-id rows are unaffected) and the poller inserts idempotently. Verified
+   live: a re-poll of the same record is absorbed, a genuine stage advance
+   still records, and Connecteam rows do not collide.
+
+**Running alongside Connecteam, not replacing it.** `project_events.source`
+already distinguishes rows, so both paths can write while they are compared
+on real jobs. If MarketSharp proves sufficient the Connecteam path retires;
+if it does not, the working push path is still there.
+
+**Secrets to set** (Project Settings → Edge Functions → Secrets), never in
+the repo: `MARKETSHARP_API_KEY`, `MARKETSHARP_API_SECRET`,
+`MARKETSHARP_COMPANY_ID`, `MARKETSHARP_EMPLOYEE_ID`. Until they are set the
+function returns a no-op rather than failing.
+
+> **Key rotation (2026-09-14):** a MarketSharp API key was pasted into a chat
+> message and must be treated as compromised. Revoke it in MarketSharp (Admin
+> → Apps & Add-ons Setup → API Maintenance) and issue a replacement into the
+> secret above.
+
 ## Open items to confirm with the Connecteam account / NYS ops before Phase 1 build-out
 
 1. Exact webhook registration flow (`Setting up webhook via API` doc) and whether NYS's Connecteam plan tier includes API + webhooks (API access is Expert/Enterprise-plan gated).
