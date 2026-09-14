@@ -14,9 +14,18 @@ struct ProjectModeView: View {
     let projectId: UUID
 
     var body: some View {
-        NavigationStack {
-            TimelineView(projectId: projectId)
+        TabView {
+            NavigationStack {
+                TimelineView(projectId: projectId)
+            }
+            .tabItem { Label("Project", systemImage: "list.bullet") }
+
+            NavigationStack {
+                PhotoFeedView(projectId: projectId)
+            }
+            .tabItem { Label("Photos", systemImage: "photo.on.rectangle") }
         }
+        .tint(NYSColor.brandRed)
     }
 }
 
