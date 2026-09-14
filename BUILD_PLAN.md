@@ -123,6 +123,34 @@ The Slack and ConnectTeam photo pipeline is an internal crew feed: dumpsters, ro
 - RLS enforces published + in-window, so an unpublished draft or expired
   promo can never leak; audience filtering is a client concern
 
+## Deferred: Siro-sourced knowledge base (2026-09-14)
+
+A knowledge base built from Siro sales-call transcripts was considered and
+**deliberately deferred to a separate application**, not cut.
+
+The reasoning: the valuable part is the *review workflow* — mining
+transcripts for recurring questions, drafting articles, routing them through
+approve/reject, versioning them, recording who signed off. That is a content
+management tool with its own users (office staff), its own permissions model
+and its own lifecycle. It shares nothing with a homeowner-facing project
+tracker except that one eventually consumes the other's output. Building it
+here would mean an internal CMS living inside a customer app.
+
+When that app exists, NYSAPP consumes a published-articles API. Until then
+the chat agent stays status-only.
+
+Two constraints to carry into that project:
+
+- **Consent.** Siro records real homeowners in sales conversations. Whoever
+  owns the Siro account must confirm those recording consents cover reuse as
+  knowledge base material before any transcript is processed.
+- **Sales language is not fact.** Transcripts capture reps persuading and
+  handling objections. Some claims are made in a sales moment and were never
+  meant as binding. An approval step between transcript and published
+  article is the mechanism that keeps a sales claim from being restated to a
+  customer who is already under contract as fact about work they paid for.
+  That is why the raw-transcript RAG approach was rejected.
+
 ## Retention
 
 Nobody opens this daily. Notifications are the product. Each needs a defined upstream trigger in the sync layer, which is why the sync layer gets prototyped first.
