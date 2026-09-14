@@ -50,12 +50,7 @@ struct TimelineView: View {
         }
         .safeAreaInset(edge: .top) {
             if let errorMessage = service.errorMessage {
-                Text(errorMessage)
-                    .font(NYSFont.body(13))
-                    .foregroundStyle(NYSColor.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(8)
-                    .background(NYSColor.actionRed)
+                NYSErrorBanner(message: errorMessage)
             }
         }
         .navigationTitle("Your Project")

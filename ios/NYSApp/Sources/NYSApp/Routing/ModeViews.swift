@@ -24,6 +24,21 @@ struct ProjectModeView: View {
                 PhotoFeedView(projectId: projectId)
             }
             .tabItem { Label("Photos", systemImage: "photo.on.rectangle") }
+
+            NavigationStack {
+                DocumentsView(projectId: projectId)
+            }
+            .tabItem { Label("Documents", systemImage: "folder") }
+
+            NavigationStack {
+                MessagesView(projectId: projectId)
+            }
+            .tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }
+
+            NavigationStack {
+                PaymentsView(projectId: projectId)
+            }
+            .tabItem { Label("Payments", systemImage: "creditcard") }
         }
         .tint(NYSColor.brandRed)
     }

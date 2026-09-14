@@ -14,7 +14,10 @@ struct PhotoFeedView: View {
     var body: some View {
         ScrollView {
             if service.photos.isEmpty && !service.isLoading {
-                emptyState
+                NYSEmptyState(
+                    title: "No photos yet",
+                    message: "Your crew's photos appear here once our office has reviewed them."
+                )
             } else {
                 LazyVStack(alignment: .leading, spacing: 24) {
                     ForEach(service.photos) { photo in
@@ -43,12 +46,7 @@ struct PhotoFeedView: View {
         }
         .safeAreaInset(edge: .top) {
             if let errorMessage = service.errorMessage {
-                Text(errorMessage)
-                    .font(NYSFont.body(13))
-                    .foregroundStyle(NYSColor.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(8)
-                    .background(NYSColor.actionRed)
+                NYSErrorBanner(message: errorMessage)
             }
         }
         .fullScreenCover(item: $selectedPhoto) { photo in
@@ -57,20 +55,6 @@ struct PhotoFeedView: View {
         .navigationTitle("Photos")
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Text("No photos yet")
-                .font(NYSFont.subheadline(17))
-                .foregroundStyle(NYSColor.black)
-            Text("Your crew's photos appear here once our office has reviewed them.")
-                .font(NYSFont.body())
-                .foregroundStyle(NYSColor.slateGray)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 32)
-        .padding(.top, 80)
-    }
 }
 
 private struct PhotoCard: View {
